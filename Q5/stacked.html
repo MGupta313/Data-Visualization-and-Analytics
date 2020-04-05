@@ -1,0 +1,192 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+	h1 {
+  font-size: 18px;
+  font-weight: normal;
+  font: sans-serif;
+}
+
+body {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: none;
+}
+
+.h1 text {
+	font-size: 20px;
+}
+</style>
+<body>
+<h1> Visualizing Earthquake Counts by State</h1>
+<select id = "opts" >
+	<option value = "ds1" selected = "selected">2017</option>
+	<option value = "ds2">2018</option>
+</select>
+
+<script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+<script>
+	var margin = {top: 15, right: 20, bottom: 30, left: 30},
+	width = 650 - margin.left - margin.right;
+	height = 500 - margin.top - margin.bottom;
+
+	var x = d3.scaleBand()
+		.range([0, width], .1)
+		.padding(0.1)
+		.paddingInner(0.1);
+
+	var y = d3.scaleLinear()
+		.range([height, 0]);
+
+
+	var xAxis = d3.axisBottom()
+    	.scale(x);
+
+	var yAxis = d3.axisLeft()
+		.scale(y)
+		.tickFormat(d3.format(".2s"))
+
+	var color = d3.scaleOrdinal()
+		.range(["#f2b447", "#d25c4d", "#b33040"]);
+ 
+	var svg = d3.select("body").append("svg")
+	    .attr("width", width + margin.left + margin.right)
+	    .attr("height", height + margin.top + margin.bottom)
+	  .append("g")
+	    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+	
+
+	var yearData = ["2017", "2018"]
+
+
+	var ds1 = d3.csv("earthquake.csv", function(d) {if (d["Year"] == "2017") {return {state: d["State"], year: d["Year"], "5_5.9": +d["5_5.9"], "6_6.9": +d["6_6.9"], "7.0+": +d["7.0+"] }}})
+
+	ds1.then(
+		function(data)
+		{
+
+			var test = d3.values(data[0])
+			//console.log(test)
+
+			var columnHeaders = d3.keys(data[0]).filter(function(key) { if (yearData[0] == "2017") {return key !== "state" && key !== "year"}; });
+			//console.log(columnHeaders)
+			color.domain(columnHeaders)
+			//console.log(color.domain())
+
+			var totalEarthquakes = d3.values(data);
+			//console.log(totalEarthquakes)
+
+			data.forEach(function(d){
+				
+				var y0= 0;
+				d.magnitude = color.domain().map(function(name) {return {name: name, y0: y0, y1: y0 += +d[name]}})
+				d.total = +d.magnitude[d.magnitude.length - 1].y1
+				//console.log(d.magnitude)
+
+				var nestedYear = d3.nest()
+            	.key(function (d) {return d.year;})
+            	.entries(data)
+            //console.log(nestedYear)
+
+
+			});
+
+			x.domain(data.map(function(d) {return d.state; }))
+			y.domain([0, d3.max(data, function(d) {return d.total; })])
+
+			svg.append("g")
+				.attr("class", "x-axis")
+				.attr("transform", "translate(0," + height+")")
+				.call(xAxis)
+			svg.append("text")
+				.attr("transform", "translate("+(width/2) +" , "+(height+margin.top+12.5)+")")
+				.style("text-anchor", "middle")
+				.text("State")
+				.style("font-size", "15px")
+
+			svg.append("g")
+				.attr("class", "y-axis")
+				.call(yAxis)
+				.append("text")
+				.attr("transform", "rotate(-90)")
+				.attr("y", 20)
+				.attr("dy", ".71em")
+				.style("text-anchor", "end")
+
+			svg.append("text")
+				.attr("transform", "rotate(-90)")
+				.attr("y", -2 -margin.left)
+				.attr("x", 0 - margin.bottom-220)
+				.attr("dy", "1em")
+				.text("Number of Earthquakes")
+				.style("font-size", "15px")
+
+
+			var states = svg.selectAll(".state")
+				.data(data)
+				.enter().append("g")
+				.attr("class", "g")
+				.attr("transform", function(d) {return "translate(" +x(d.state)+ ",0)";});
+			
+			
+			states.selectAll(".bar")
+				.data(function(d) {return d.magnitude; })
+				.enter()
+				.append("rect")
+				.attr("class", "bar")
+				.attr("width", function(d) {return x.bandwidth()})
+				.attr("y", function(d) {return y(d.y1); })
+				.attr("height", function(d) {return y(d.y0) -y(d.y1); })
+				.style("fill", function(d) {return color(d.name); })
+
+			svg.selectAll("text.bar")
+				.data(data)
+				.enter()
+				.append("text")
+				.attr("class", "bar")
+				.attr("text-anchor", "middle")
+				.attr("x", function(d) {return x(d.state) +x.bandwidth()/2})
+				.attr("y", function(d) {return y(d.y1) -5})
+				.text(function(d) {return d.total})
+
+
+			var legend = svg.selectAll(".legend")
+				.data(color.domain().slice().reverse())
+				.enter().append("g")
+				.attr("class", "legend")
+				.attr("transform", function(d, i) {return "translate(0," +i*20+")"; });
+			legend.append("rect")
+				.attr("x", width+5)
+				.attr("width", 18)
+				.attr("height", 18)
+				.style("fill", color);
+
+			legend.append("text")
+				.attr("x", width)
+				.attr("y", 9)
+				.attr("dy", ".35em")
+				.style("text-anchor", "end")
+				.text(function(d) {return d; });
+
+		})
+	svg.append("text)
+		  	.attr("x", width-100)
+			.attr("y", 450)
+			.text("mgupta313")
+function onOptionChange() {
+		newData = ds1
+	}
+
+
+</script>
+
+</body>

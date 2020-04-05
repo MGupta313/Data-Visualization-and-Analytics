@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+<meta charset="utf-8">
+<style>
+	.d3-tip {
+  line-height: 1;
+  font-weight: bold;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+
+	.d3-tip:after {
+  box-sizing: border-box;
+  display: inline;
+  font-size: 10px;
+  width: 100%;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.8);
+  content: "\25BC";
+  position: absolute;
+  text-align: center;
+}
+
+/* Style northward tooltips differently */
+.d3-tip.n:after {
+  margin: -1px 0 0 0;
+  top: 100%;
+  left: 0;
+}
+</style>
+<head>
+	<script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+	<script type="text/javascript" src="../lib/topojson.v2.min.js"></script>
+	<script type="text/javascript" src="../lib/d3-fetch.min.js"></script>
+	<script type="text/javascript" src="../lib/d3-dsv.min.js"></script>
+	<script type="text/javascript" src="../lib/d3-scale-chromatic.v1.min.js"></script>
+	<script type="text/javascript" src="../lib/d3-simple-slider.min.js"></script>
+	<script type="text/javascript" src="../lib/d3-tip.min.js"></script>
+	
+</head>
+<body>
+
+<p id="value"></p>
+<div id="slider"></div>
+	<script>
+
+		var width=900,
+			height=600;
+
+		var projection = d3.geoAlbersUsa()
+			.scale(800)
+			.translate([width/2, height/2]);
+
+		var path = d3.geoPath()
+			.projection(projection);
+
+		var svg = d3.select("body").append("svg")
+			.attr("width", width)
+			.attr("height", height);
+
+ 		var dataTime = d3.range(0, 6).map(function(d) {return new Date (2010 +d, 10, 3)})
+		var slider = d3
+		    .sliderHorizontal()
+		    .min(d3.min(dataTime))
+		    .max(d3.max(dataTime))
+		    .step(1000*60*60*24*365)
+		    .width(300)
+		    .tickFormat(d3.timeFormat('%Y'))
+		    .tickValues(dataTime)
+		    .default(new Date(2010, 10, 3))
+		    .displayValue(false)
+		    //.on('onchange', val => {
+      		//d3.select('#value').text(val);
+    		//});
+
+		//var earthquakes = d3.map();
+
+		Promise.all([d3.json("states-10m.json"), d3.csv("state-earthquakes.csv", function(d) {return {states: d["States"], region: d["Region"],ten: +d["2010"], eleven: +d["2011"], twelve: +d["2012"], thirteen: +d["2013"], fourteen: +d["2014"], fifteen: +d["2015"], total: +d["Total Earthquakes"]}; })]).then(analyze)
+
+		function analyze(dataset) {
+			const[stateData, earthquakeData] = dataset
+
+			const topojsonObj = topojson.feature(stateData, stateData.objects.states);
+			const topojsonData = topojsonObj.features;
+
+			var tip = d3.tip()
+			  .attr('class', 'd3-tip')
+			  .offset([-10, 0])
+			  .html(function(d) {
+			    return "<strong>State:\nRegion:\nYear:\nEarthquakes:</strong> <span style='color:white'>"+d.region+"</span>";})
+
+			 svg.call(tip);
+
+			var earthquakeByState = {};
+				earthquakeData.forEach(function(d){
+				earthquakeByState[d.states] = d.ten;
+			})
+
+			var objectToArray = d3.map(earthquakeByState);
+			//var earthquakeValues = objectToArray.values()
+			//console.log(objectToArray)
+
+			var x_domain = [d3.min(objectToArray.values()), d3.max(objectToArray.values())];
+			//console.log(x_domain)
+
+			var x = d3.scaleLog()
+			.domain(x_domain)
+			.range([1, 10]);
+
+			//console.log(x)
+			//console.log(x.range());
+
+			var color = d3.scaleThreshold()
+			.domain(d3.range(2, 10))
+			.range(d3.schemeReds[9])
+			//console.log(color(1))
+
+			var colorScale = d3.scaleThreshold()
+			.domain([1, 5, 10, 50, 100, 500, 1000, 2000])
+			.range(d3.schemeReds[9]);
+
+			var color_domain = [1, 5, 10, 50, 100, 500, 1000, 2000]
+		var legend_labels = ["1", "5", "10", "50", "100", "500", "1000", "2000"]
+		var colorScale = d3.scaleThreshold()
+			.domain([1, 5, 10, 50, 100, 500, 1000, 2000])
+			.range(d3.schemeReds[9]);
+
+		var legend = svg.selectAll("g.legend")
+			.data(color_domain)
+			.enter().append("g")
+			.attr("class", "legend");
+
+		var ls_w = 20, ls_h = 20;
+
+		legend.append("rect")
+			.attr("x", 800)
+			.attr("y", function(d, i){return height - (i*ls_h) - 22*ls_h;})
+			.attr("width", ls_w)
+			.attr("height", ls_h)
+			.style("fill", function(d){return colorScale(d); })
+			.style("opacity", 3);
+
+		legend.append("text")
+			.attr("x", 830)
+			.attr("y", function(d, i) {return height - i*(ls_h) - 21.25*ls_h;})
+			.text(function(d, i) {return legend_labels[i]; });
+
+			svg.append('g')
+				.attr("class", "states")
+				.selectAll('path')
+				.data(topojsonData)
+				.enter().append('path')
+				//.attr("d", path)
+				.attr("fill", function(d) {
+					//if statement for undefined states - give lightest color
+					if (earthquakeByState[d.properties.name] === "undefined") {return color(1)}
+					else {return color(earthquakeByState[d.properties.name])} ;
+				})
+				.attr("d", path)
+				//.style("fill", "white")
+				.style("stroke", "black")
+				.on('mouseover', tip.show)
+      			.on('mouseout', tip.hide);
+
+		  d3.select('#slider')
+		    .append('svg')
+		    .attr('width', 500)
+		    .attr('height', 100)
+		    .append('g')
+		    .attr('transform', 'translate(30,30)')
+		    .call(slider);
+		   svg.append("text)
+		  	.attr("x", width-100)
+			.attr("y", 450)
+			.text("mgupta313")
+			
+
+		//console.log(dataset);
+		//console.log(stateData);
+		//console.log(earthquakeData);
+		//console.log(earthquakeByState);
+		//console.log(earthquakeByState;
+		}
+
+
+
+
+	</script>
+</body>
+</html>
