@@ -1,0 +1,8 @@
+1. What is the main reason to use a random forest versus a decision tree? (<= 50 words)
+Random forests consist of multiple single trees each based on a random sample of the training data. They are typically more accurate than single decision trees. Two reasons why random forests outperform single decision trees are: higher resolution in the feature space and handling overfitting
+
+2. How long did your random forest take to run? (in seconds)
+1 min 30 seconds
+
+3. What accuracy (to two decimal places, xx.xx%) were you able to obtain?
+
